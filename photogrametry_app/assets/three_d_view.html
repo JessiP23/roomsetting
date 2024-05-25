@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Room View</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Scene setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Room creation
+    const roomGeometry = new THREE.BoxGeometry(10, 10, 10);
+    const roomMaterials = [
+      new THREE.MeshBasicMaterial({color: 0xff0000, side: THREE.BackSide}), // Left wall
+      new THREE.MeshBasicMaterial({color: 0x00ff00, side: THREE.BackSide}), // Right wall
+      new THREE.MeshBasicMaterial({color: 0x0000ff, side: THREE.BackSide}), // Top
+      new THREE.MeshBasicMaterial({color: 0xffff00, side: THREE.BackSide}), // Bottom
+      new THREE.MeshBasicMaterial({color: 0x00ffff, side: THREE.BackSide}), // Front wall
+      new THREE.MeshBasicMaterial({color: 0xff00ff, side: THREE.BackSide}), // Back wall
+    ];
+    const room = new THREE.Mesh(roomGeometry, roomMaterials);
+    scene.add(room);
+
+    // Camera position
+    camera.position.z = 15;
+
+    // Render loop
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
