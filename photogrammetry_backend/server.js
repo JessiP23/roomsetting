@@ -22,6 +22,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+
 app.post('/upload', upload.array('images', 12), (req, res) => {
   exec('python3 photogrammetry.py', (error, stdout, stderr) => {
     if (error) {
