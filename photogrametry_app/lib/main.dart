@@ -60,46 +60,55 @@ class _WallCaptureScreenState extends State<WallCaptureScreen> {
   final List<String> walls = ['Wall 1', 'Wall 2', 'Wall 3']; // Add more walls as needed
 
   Future<void> captureAndUploadImage() async {
-    final pickedFile = await picker.getImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        isUploading = true;
-      });
+  final pickedFile = await picker.getImage(source: ImageSource.gallery);
+  if (pickedFile != null) {
+    setState(() {
+      isUploading = true;
+    });
 
-      final url = Uri.parse('http://localhost:3000/upload'); // Replace with your server URL
-      final request = http.MultipartRequest('POST', url);
-      request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+    print('Picked file path: ${pickedFile.path}');
+
+    final url = Uri.parse('http://localhost:3000/upload'); // Replace with your server URL
+    final request = http.MultipartRequest('POST', url);
+    request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+
+    try {
       final response = await request.send();
-
+      if (response.statusCode == 201) { // Change this to the appropriate status code returned by your server
+        setState(() {
+          isUploading = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ImageUploadPage(),
+          ),
+        );
+      } else {
+        setState(() {
+          isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed. Server responded with status code ${response.statusCode}.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
       setState(() {
         isUploading = false;
       });
-
-      if (response.statusCode == 200) {
-        if (currentWallIndex < walls.length - 1) {
-          setState(() {
-            currentWallIndex++;
-          });
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => WallCaptureScreen(wallName: walls[currentWallIndex]),
-            ),
-          );
-        } else {
-          // If all walls are captured, navigate to the 3D view page
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ThreeDViewPage(),
-            ),
-          );
-        }
-      } else {
-        print('Image Upload Failed');
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Image upload failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +123,55 @@ class _WallCaptureScreenState extends State<WallCaptureScreen> {
                 onPressed: captureAndUploadImage,
                 child: Text('Capture or Select Image for ${widget.wallName}'),
               ),
+      ),
+    );
+  }
+}
+
+class ImageUploadPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Upload Images'),
+      ),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () async {
+            final pickedFile = await ImagePicker().getImage(source: ImageSource.gallery);
+            if (pickedFile != null) {
+              final url = Uri.parse('http://localhost:3000/upload');
+              final request = http.MultipartRequest('POST', url);
+              request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+              try {
+                final response = await request.send();
+                if (response.statusCode == 201) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Image uploaded successfully.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Image upload failed. Server responded with status code ${response.statusCode}.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Image upload failed: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+          child: Text('Upload Image'),
+        ),
       ),
     );
   }
