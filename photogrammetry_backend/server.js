@@ -2,42 +2,52 @@ const express = require('express');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const { exec } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
 const app = express();
 const port = 3000;
-
-// Serve static files
-app.use(express.static('public'));
 
 // MongoDB connection
 mongoose.connect('mongodb://localhost:27017/photogrammetry', { useNewUrlParser: true, useUnifiedTopology: true });
 
+const userSchema = new mongoose.Schema({
+  userId: String,
+  images: [String]
+});
+
+const User = mongoose.model('User', userSchema);
+
 // Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    const userId = req.body.userId;
+    const userDir = path.join('uploads', userId);
+    if (!fs.existsSync(userDir)) {
+      fs.mkdirSync(userDir, { recursive: true });
+    }
+    cb(null, userDir);
   },
   filename: function (req, file, cb) {
     cb(null, file.originalname);
   }
 });
+
 const upload = multer({ storage: storage });
 
+app.post('/upload', upload.single('image'), async (req, res) => {
+  const userId = req.body.userId;
+  const user = await User.findOne({ userId });
 
-app.post('/upload', upload.single('image'), (req, res) => {
-  exec('python3 photogrammetry.py', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error: ${error.message}`);
-      res.status(500).send('Photogrammetry processing failed');
-      return;
-    }
-    if (stderr) {
-      console.error(`Stderr: ${stderr}`);
-      res.status(500).send('Photogrammetry processing error');
-      return;
-    }
-    console.log(`Stdout: ${stdout}`);
-    res.status(201).send('Images processed successfully');
-  });
+  if (user) {
+    user.images.push(req.file.path);
+    await user.save();
+  } else {
+    const newUser = new User({ userId, images: [req.file.path] });
+    await newUser.save();
+  }
+
+  res.status(201).send('Image uploaded and stored successfully');
 });
 
 app.listen(port, () => {

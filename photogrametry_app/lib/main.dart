@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'dart:async';
+import 'dart:io';
 
 void main() {
   runApp(const MyApp());
@@ -22,7 +22,42 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
+  @override
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  final List<String> sections = ['Wall 1', 'Wall 2', 'Wall 3', 'Wall 4', 'Roof', 'Floor'];
+  final Map<String, bool> uploadStatus = {};
+  bool allUploaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (var section in sections) {
+      uploadStatus[section] = false;
+    }
+  }
+
+  Future<void> uploadImage(String section) async {
+    final pickedFile = await ImagePicker().getImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      final url = Uri.parse('http://localhost:3000/upload');
+      final request = http.MultipartRequest('POST', url);
+      request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+      final response = await request.send();
+      if (response.statusCode == 201) {
+        setState(() {
+          uploadStatus[section] = true;
+          allUploaded = uploadStatus.values.every((status) => status);
+        });
+      } else {
+        print('Image upload failed.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,162 +65,27 @@ class MyHomePage extends StatelessWidget {
         title: Text('Photogrammetry App Home Page'),
       ),
       body: Center(
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => WallCaptureScreen(wallName: 'Wall 1')),
-            );
-          },
-          child: Text('Start Capturing Images'),
-        ),
-      ),
-    );
-  }
-}
-
-class WallCaptureScreen extends StatefulWidget {
-  final String wallName;
-
-  const WallCaptureScreen({Key? key, required this.wallName}) : super(key: key);
-
-  @override
-  _WallCaptureScreenState createState() => _WallCaptureScreenState();
-}
-
-class _WallCaptureScreenState extends State<WallCaptureScreen> {
-  final picker = ImagePicker();
-  bool isUploading = false;
-  int currentWallIndex = 0;
-  final List<String> walls = ['Wall 1', 'Wall 2', 'Wall 3']; // Add more walls as needed
-
-  Future<void> captureAndUploadImage() async {
-  final pickedFile = await picker.getImage(source: ImageSource.gallery);
-  if (pickedFile != null) {
-    setState(() {
-      isUploading = true;
-    });
-
-    print('Picked file path: ${pickedFile.path}');
-
-    final url = Uri.parse('http://localhost:3000/upload'); // Replace with your server URL
-    final request = http.MultipartRequest('POST', url);
-    request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
-
-    try {
-      final response = await request.send();
-      if (response.statusCode == 201) { // Change this to the appropriate status code returned by your server
-        setState(() {
-          isUploading = false;
-        });
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ImageUploadPage(),
-          ),
-        );
-      } else {
-        setState(() {
-          isUploading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Image upload failed. Server responded with status code ${response.statusCode}.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        isUploading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Image upload failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-}
-
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.wallName),
-      ),
-      body: Center(
-        child: isUploading
-            ? CircularProgressIndicator()
-            : ElevatedButton(
-                onPressed: captureAndUploadImage,
-                child: Text('Capture or Select Image for ${widget.wallName}'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var section in sections) 
+              ElevatedButton(
+                onPressed: uploadStatus[section]! ? null : () => uploadImage(section),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: uploadStatus[section]! ? Colors.green : null,
+                ),
+                child: Text(uploadStatus[section]! ? '$section Uploaded' : 'Upload $section'),
               ),
-      ),
-    );
-  }
-}
-
-class ImageUploadPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Upload Images'),
-      ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () async {
-            final pickedFile = await ImagePicker().getImage(source: ImageSource.gallery);
-            if (pickedFile != null) {
-              final url = Uri.parse('http://localhost:3000/upload');
-              final request = http.MultipartRequest('POST', url);
-              request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
-              try {
-                final response = await request.send();
-                if (response.statusCode == 201) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Image uploaded successfully.'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Image upload failed. Server responded with status code ${response.statusCode}.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Image upload failed: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            }
-          },
-          child: Text('Upload Image'),
+            if (allUploaded)
+              ElevatedButton(
+                onPressed: () {
+                  // Handle the submission of room dimensions here
+                  print('All images uploaded. Submitting room dimensions...');
+                },
+                child: Text('Submit Room Dimensions'),
+              ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-class ThreeDViewPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('3D View'),
-      ),
-      body: Center(
-        child: Text('3D view of the captured images will be displayed here.'),
       ),
     );
   }
