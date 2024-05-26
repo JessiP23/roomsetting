@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 
 void main() {
   runApp(const MyApp());
@@ -41,20 +41,33 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> uploadImage(String section) async {
-    final pickedFile = await ImagePicker().getImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
+    print('Picking file for $section');
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null) {
+      Uint8List fileBytes = result.files.first.bytes!;
+      String fileName = result.files.first.name;
+      print('Picked file: $fileName');
+
       final url = Uri.parse('http://localhost:3000/upload');
       final request = http.MultipartRequest('POST', url);
-      request.files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+      request.files.add(http.MultipartFile.fromBytes(
+        'image',
+        fileBytes,
+        filename: fileName,
+      ));
+      print('Sending request to server');
       final response = await request.send();
       if (response.statusCode == 201) {
+        print('Upload successful for $section');
         setState(() {
           uploadStatus[section] = true;
           allUploaded = uploadStatus.values.every((status) => status);
         });
       } else {
-        print('Image upload failed.');
+        print('Image upload failed with status: ${response.statusCode}');
       }
+    } else {
+      print('File picking cancelled.');
     }
   }
 
